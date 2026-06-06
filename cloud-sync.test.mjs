@@ -39,4 +39,13 @@ assert.equal(
   'keeps the newest version when two devices edit the same event'
 );
 
+assert.equal(
+  mergeEventsForSync(
+    [{ id: 'same-delete', title: '手机旧记录', date: '2026-06-10', updatedAt: '2026-06-06T10:00:00.000Z' }],
+    [{ id: 'same-delete', title: '手机旧记录', date: '2026-06-10', updatedAt: '2026-06-06T12:00:00.000Z', deletedAt: '2026-06-06T12:00:00.000Z' }]
+  )[0].deletedAt,
+  '2026-06-06T12:00:00.000Z',
+  'keeps a newer deletion tombstone so deleted events do not reappear'
+);
+
 console.log('cloud sync tests passed');
