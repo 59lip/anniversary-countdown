@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   describeEventDistance,
+  filterEvents,
   formatEventRule,
   getNextOccurrence,
   normalizeEvent,
@@ -17,26 +18,8 @@ assert.equal(getNextOccurrence({ repeatType: 'yearly', repeatValue: '09-06' }, b
 assert.equal(getNextOccurrence({ repeatType: 'yearly', repeatValue: '06-10' }, base), '2027-06-10');
 
 assert.deepEqual(
-  normalizeEvent({
-    title: '发工资',
-    date: '2026-06-10',
-    category: 'work',
-    icon: 'wallet',
-    repeatType: 'monthly',
-    repeatValue: '10'
-  }),
-  {
-    id: '',
-    title: '发工资',
-    date: '2026-06-10',
-    category: 'work',
-    icon: 'wallet',
-    repeatType: 'monthly',
-    repeatValue: '10',
-    updatedAt: '',
-    deletedAt: '',
-    note: ''
-  }
+  normalizeEvent({ title: '发工资', date: '2026-06-10', category: 'work', icon: 'wallet', repeatType: 'monthly', repeatValue: '10' }),
+  { id: '', title: '发工资', date: '2026-06-10', category: 'work', icon: 'wallet', repeatType: 'monthly', repeatValue: '10', updatedAt: '', deletedAt: '', note: '' }
 );
 
 assert.equal(normalizeEvent({ title: '高考', date: '2026-06-07' }).repeatType, 'none');
@@ -49,13 +32,18 @@ assert.equal(salary.num, '29');
 assert.equal(salary.label, '还有 29 天');
 assert.equal(salary.nextDate, '2026-07-10');
 
-const sorted = sortEvents(
-  [
-    { title: '下月发工资', date: '2026-06-10', repeatType: 'monthly', repeatValue: '10' },
-    { title: '明天周五', date: '2026-06-12', repeatType: 'weekly', repeatValue: '5' }
-  ],
-  base
-);
-assert.equal(sorted[0].title, '明天周五');
+const sampleEvents = [
+  { title: '下月发工资', date: '2026-06-10', repeatType: 'monthly', repeatValue: '10' },
+  { title: '明天周五', date: '2026-06-12', repeatType: 'weekly', repeatValue: '5' },
+  { title: '今天', date: '2026-06-11' },
+  { title: '很远', date: '2026-08-01' },
+  { title: '已删除', date: '2026-06-11', deletedAt: '2026-06-11T10:00:00.000Z' }
+];
+
+const sorted = sortEvents(sampleEvents, base);
+assert.equal(sorted[0].title, '今天');
+assert.deepEqual(filterEvents(sampleEvents, 'today', base).map(event => event.title), ['今天']);
+assert.deepEqual(filterEvents(sampleEvents, 'recent', base).map(event => event.title), ['今天', '明天周五', '下月发工资']);
+assert.equal(filterEvents(sampleEvents, 'all', base).some(event => event.title === '已删除'), false);
 
 console.log('event recurrence tests passed');
