@@ -162,6 +162,16 @@ export function sortEvents(events, baseDate = new Date()) {
   });
 }
 
+export function shouldKeepLocalAfterCloudPull(localEvents, cloudEvents, options = {}) {
+  return Boolean(
+    options.missingColumns &&
+    Array.isArray(localEvents) &&
+    localEvents.length > 0 &&
+    Array.isArray(cloudEvents) &&
+    cloudEvents.length === 0
+  );
+}
+
 export function serializeEvents(events) {
   const json = JSON.stringify(events.map(normalizeEvent));
   return btoa(unescape(encodeURIComponent(json)));
