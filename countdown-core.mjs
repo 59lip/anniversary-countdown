@@ -61,6 +61,17 @@ function normalizeRepeatValue(repeatType, value, date) {
   return `${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
+function normalizeUpdatedAt(value) {
+  const updatedAt = String(value || '').trim();
+  if (!updatedAt) return '';
+  return Number.isNaN(Date.parse(updatedAt)) ? '' : updatedAt;
+}
+
+function eventTimestamp(event) {
+  const parsed = Date.parse(event?.updatedAt || '');
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
 export function daysBetween(targetDate, baseDate = new Date()) {
   const target = dateOnly(targetDate);
   const base = dateOnly(
@@ -134,6 +145,7 @@ export function normalizeEvent(event) {
   const icon = ICONS.has(String(event?.icon || '').trim()) ? String(event.icon).trim() : '';
   const repeatType = normalizeRepeatType(event?.repeatType);
   const repeatValue = normalizeRepeatValue(repeatType, event?.repeatValue, date);
+  const updatedAt = normalizeUpdatedAt(event?.updatedAt || event?.updated_at);
   const note = String(event?.note || '').trim();
 
   if (!title) throw new Error('标题不能为空');
@@ -148,6 +160,7 @@ export function normalizeEvent(event) {
     icon,
     repeatType,
     repeatValue,
+    updatedAt,
     note
   };
 }
@@ -170,6 +183,19 @@ export function shouldKeepLocalAfterCloudPull(localEvents, cloudEvents, options 
     Array.isArray(cloudEvents) &&
     cloudEvents.length === 0
   );
+}
+
+export function mergeEventsForSync(localEvents, cloudEvents) {
+  const merged = new Map();
+  for (const rawEvent of [...(localEvents || []), ...(cloudEvents || [])]) {
+    const event = normalizeEvent(rawEvent);
+    if (!event.id) continue;
+    const existing = merged.get(event.id);
+    if (!existing || eventTimestamp(event) >= eventTimestamp(existing)) {
+      merged.set(event.id, event);
+    }
+  }
+  return [...merged.values()];
 }
 
 export function serializeEvents(events) {
