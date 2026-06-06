@@ -7,6 +7,7 @@ create table if not exists public.countdown_events (
   icon text not null default '',
   repeat_type text not null default 'none',
   repeat_value text not null default '',
+  updated_at timestamptz not null default now(),
   note text not null default '',
   inserted_at timestamptz not null default now()
 );
@@ -14,7 +15,8 @@ create table if not exists public.countdown_events (
 alter table public.countdown_events
   add column if not exists icon text not null default '',
   add column if not exists repeat_type text not null default 'none',
-  add column if not exists repeat_value text not null default '';
+  add column if not exists repeat_value text not null default '',
+  add column if not exists updated_at timestamptz not null default now();
 
 create index if not exists countdown_events_owner_key_idx
   on public.countdown_events (owner_key);
