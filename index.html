@@ -82,6 +82,7 @@ import {
   normalizeEvent,
   normalizeSupabaseConfig,
   serializeEvents,
+  shouldKeepLocalAfterCloudPull,
   sortEvents
 } from './countdown-core.mjs';
 
@@ -299,12 +300,15 @@ async function connectSupabase() {
 
 async function pullCloud() {
   if (!supabaseClient) return;
+  const localBeforePull = [...events];
+  let missingColumns = false;
   let { data, error } = await supabaseClient
     .from('countdown_events')
     .select('id,title,date,category,icon,repeat_type,repeat_value,note')
     .eq('owner_key', ownerKey)
     .order('date', { ascending: true });
   if (isMissingCloudColumns(error)) {
+    missingColumns = true;
     const fallback = await supabaseClient
       .from('countdown_events')
       .select('id,title,date,category,note')
@@ -315,7 +319,13 @@ async function pullCloud() {
     setStatus('云端表还没更新字段：先按旧数据读取。请执行 supabase-schema.sql 后再同步新功能。', 'warn');
   }
   if (error) throw error;
-  events = data.map(cloudRowToEvent);
+  const cloudEvents = data.map(cloudRowToEvent);
+  if (shouldKeepLocalAfterCloudPull(localBeforePull, cloudEvents, { missingColumns })) {
+    events = localBeforePull;
+    saveLocal();
+    return;
+  }
+  events = cloudEvents;
   saveLocal();
 }
 
