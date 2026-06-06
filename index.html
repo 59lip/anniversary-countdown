@@ -282,6 +282,10 @@ function eventToCloudRow(event) {
   };
 }
 
+function isMissingCloudColumns(error) {
+  return /column .*countdown_events\.(icon|repeat_type|repeat_value).*does not exist/i.test(String(error?.message || ''));
+}
+
 async function connectSupabase() {
   const saved = readConfig();
   if (!saved.url || !saved.key) return false;
@@ -295,11 +299,21 @@ async function connectSupabase() {
 
 async function pullCloud() {
   if (!supabaseClient) return;
-  const { data, error } = await supabaseClient
+  let { data, error } = await supabaseClient
     .from('countdown_events')
     .select('id,title,date,category,icon,repeat_type,repeat_value,note')
     .eq('owner_key', ownerKey)
     .order('date', { ascending: true });
+  if (isMissingCloudColumns(error)) {
+    const fallback = await supabaseClient
+      .from('countdown_events')
+      .select('id,title,date,category,note')
+      .eq('owner_key', ownerKey)
+      .order('date', { ascending: true });
+    data = fallback.data;
+    error = fallback.error;
+    setStatus('云端表还没更新字段：先按旧数据读取。请执行 supabase-schema.sql 后再同步新功能。', 'warn');
+  }
   if (error) throw error;
   events = data.map(cloudRowToEvent);
   saveLocal();
@@ -350,7 +364,6 @@ function render() {
       <div class="card-meta">
         <span>${escapeHtml(labels[event.category] || labels.custom)}</span>
         <span>${escapeHtml(formatEventRule(event))}</span>
-        <span>下一次 ${escapeHtml(distance.nextDate)}</span>
         ${event.note ? `<span>${escapeHtml(event.note)}</span>` : ''}
       </div>
       <div class="card-emoji">${selectedIcon(event)}</div>
