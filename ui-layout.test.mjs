@@ -23,7 +23,7 @@ assert.match(html, /data-filter="today"/, 'today filter is clickable');
 assert.match(html, /filterEvents/, 'home filters use core filtering');
 assert.match(html, /isMissingCloudColumns/, 'cloud sync tolerates old Supabase schemas');
 assert.match(html, /await pullCloud\(\);\s*await pushCloud\(\);\s*await pullCloud\(\);/s, 'sync performs a merge round trip');
-assert.match(html, /setTimeout\(\(\) => \{\s*el\.status\.textContent = '';/s, 'status auto clears');
+assert.match(html, /setTimeout\(\(\)\s*=>\s*\{\s*el\.status\.textContent\s*=\s*'';/s, 'status auto clears');
 
 const eventsIndex = html.indexOf('id="eventsSection"');
 const dialogIndex = html.indexOf('id="eventDialog"');
