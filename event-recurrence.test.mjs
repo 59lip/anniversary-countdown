@@ -34,6 +34,7 @@ assert.deepEqual(
     repeatType: 'monthly',
     repeatValue: '10',
     updatedAt: '',
+    deletedAt: '',
     note: ''
   }
 );
