@@ -4,9 +4,17 @@ create table if not exists public.countdown_events (
   title text not null,
   date date not null,
   category text not null default 'custom',
+  icon text not null default '',
+  repeat_type text not null default 'none',
+  repeat_value text not null default '',
   note text not null default '',
   inserted_at timestamptz not null default now()
 );
+
+alter table public.countdown_events
+  add column if not exists icon text not null default '',
+  add column if not exists repeat_type text not null default 'none',
+  add column if not exists repeat_value text not null default '';
 
 create index if not exists countdown_events_owner_key_idx
   on public.countdown_events (owner_key);
