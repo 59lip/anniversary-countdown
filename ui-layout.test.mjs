@@ -10,14 +10,20 @@ assert.match(html, /data-view-target="cloud"/, 'sidebar links to cloud settings 
 assert.match(html, /id="homeView"/, 'has home view');
 assert.match(html, /id="cloudView"/, 'has cloud settings view');
 assert.match(html, /id="addEventButton"/, 'has a top-right add button');
+assert.match(html, /id="homeSync"/, 'has a home sync button');
 assert.match(html, /id="eventDialog"/, 'has an add/edit modal dialog');
 assert.match(html, /id="iconPicker"/, 'add dialog has an icon picker');
 assert.match(html, /id="repeatType"/, 'add dialog has repeat type selector');
 assert.match(html, /id="weeklyValue"/, 'add dialog supports weekly recurrence');
 assert.match(html, /id="monthlyValue"/, 'add dialog supports monthly recurrence');
 assert.match(html, /id="yearlyValue"/, 'add dialog supports yearly recurrence');
+assert.match(html, /data-filter="all"/, 'all filter is clickable');
+assert.match(html, /data-filter="recent"/, 'recent filter is clickable');
+assert.match(html, /data-filter="today"/, 'today filter is clickable');
+assert.match(html, /filterEvents/, 'home filters use core filtering');
 assert.match(html, /isMissingCloudColumns/, 'cloud sync tolerates old Supabase schemas');
-assert.match(html, /await pullCloud\(\);\s*await pushCloud\(\);\s*await pullCloud\(\);/s, 'save cloud performs a merge round trip');
+assert.match(html, /await pullCloud\(\);\s*await pushCloud\(\);\s*await pullCloud\(\);/s, 'sync performs a merge round trip');
+assert.match(html, /setTimeout\(\(\) => \{\s*el\.status\.textContent = '';/s, 'status auto clears');
 
 const eventsIndex = html.indexOf('id="eventsSection"');
 const dialogIndex = html.indexOf('id="eventDialog"');
@@ -28,6 +34,9 @@ assert.ok(dialogIndex > eventsIndex, 'add form lives in modal after home content
 assert.ok(cloudViewIndex > eventsIndex, 'cloud settings view is separate from home countdowns');
 assert.equal(html.includes('id="addSection"'), false, 'home does not contain inline add form section');
 assert.equal(html.includes('id="homeSyncSection"'), false, 'home does not contain inline sync panel');
+assert.equal(html.includes('searchParams.set(\'data\''), false, 'sync links do not embed event data');
+assert.equal(html.includes('卡片式倒计时'), false, 'home removes eyebrow copy');
+assert.equal(html.includes('用清晰'), false, 'home removes descriptive copy');
 assert.equal(html.includes('下一次 ${escapeHtml(distance.nextDate)}'), false, 'cards do not show the next occurrence date');
 
 console.log('ui layout tests passed');
