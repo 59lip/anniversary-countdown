@@ -79,6 +79,7 @@ import {
   describeEventDistance,
   deserializeEvents,
   formatEventRule,
+  mergeEventsForSync,
   normalizeEvent,
   normalizeSupabaseConfig,
   serializeEvents,
@@ -109,473 +110,70 @@ const iconOptions = [
   ['plane', '✈️'],
   ['briefcase', '💼']
 ];
-const defaultIcons = {
-  anniversary: 'heart',
-  birthday: 'cake',
-  exam: 'book',
-  travel: 'train',
-  work: 'briefcase',
-  custom: 'star'
-};
+const defaultIcons = { anniversary: 'heart', birthday: 'cake', exam: 'book', travel: 'train', work: 'briefcase', custom: 'star' };
 const text = {
-  save: '保存',
-  update: '更新',
-  empty: '还没有倒计时，先添加一个重要日期。',
-  localSaved: '已保存到本地。配置云端后可跨设备同步。',
-  cloudSaved: '已同步到云端。',
-  cloudConnected: '已连接云端同步。',
-  configSaved: '云端配置已保存，并已拉取当前同步空间的数据。',
-  shareCopied: '同步链接已显示并复制。手机打开后使用同一 Supabase 配置即可同步。',
-  shareShown: '复制受限，请手动复制页面中显示的同步链接。'
+  save: '保存', update: '更新', empty: '还没有倒计时，先添加一个重要日期。',
+  localSaved: '已保存到本地。配置云端后可跨设备同步。', cloudSaved: '已同步到云端。', cloudConnected: '已连接云端同步。',
+  configSaved: '云端配置已保存，并已合并同步当前空间的数据。',
+  shareCopied: '同步链接已显示并复制。手机打开后使用同一 Supabase 配置即可同步。', shareShown: '复制受限，请手动复制页面中显示的同步链接。'
 };
-const labels = {
-  anniversary: '纪念日',
-  birthday: '生日',
-  exam: '考试',
-  travel: '旅行',
-  work: '工作',
-  custom: '其他'
-};
+const labels = { anniversary: '纪念日', birthday: '生日', exam: '考试', travel: '旅行', work: '工作', custom: '其他' };
 const el = {
-  body: document.body,
-  sidebarToggle: document.querySelector('#sidebarToggle'),
-  navButtons: document.querySelectorAll('[data-view-target]'),
-  addEventButton: document.querySelector('#addEventButton'),
-  eventDialog: document.querySelector('#eventDialog'),
-  closeEventDialog: document.querySelector('#closeEventDialog'),
-  form: document.querySelector('#eventForm'),
-  eventId: document.querySelector('#eventId'),
-  title: document.querySelector('#title'),
-  date: document.querySelector('#date'),
-  category: document.querySelector('#category'),
-  repeatType: document.querySelector('#repeatType'),
-  weeklyField: document.querySelector('#weeklyField'),
-  weeklyValue: document.querySelector('#weeklyValue'),
-  monthlyField: document.querySelector('#monthlyField'),
-  monthlyValue: document.querySelector('#monthlyValue'),
-  yearlyField: document.querySelector('#yearlyField'),
-  yearlyValue: document.querySelector('#yearlyValue'),
-  icon: document.querySelector('#icon'),
-  iconPicker: document.querySelector('#iconPicker'),
-  note: document.querySelector('#note'),
-  events: document.querySelector('#events'),
-  status: document.querySelector('#status'),
-  supabaseUrl: document.querySelector('#supabaseUrl'),
-  supabaseKey: document.querySelector('#supabaseKey'),
-  saveCloud: document.querySelector('#saveCloud'),
-  newSpace: document.querySelector('#newSpace'),
-  shareSync: document.querySelector('#shareSync'),
-  shareOutput: document.querySelector('#shareOutput'),
-  shareLink: document.querySelector('#shareLink'),
-  exportJson: document.querySelector('#exportJson'),
-  importJson: document.querySelector('#importJson'),
-  importButton: document.querySelector('#importButton'),
-  saveEvent: document.querySelector('#saveEvent'),
-  resetForm: document.querySelector('#resetForm')
+  sidebarToggle: document.querySelector('#sidebarToggle'), navButtons: document.querySelectorAll('[data-view-target]'), addEventButton: document.querySelector('#addEventButton'),
+  eventDialog: document.querySelector('#eventDialog'), closeEventDialog: document.querySelector('#closeEventDialog'), form: document.querySelector('#eventForm'),
+  eventId: document.querySelector('#eventId'), title: document.querySelector('#title'), date: document.querySelector('#date'), category: document.querySelector('#category'),
+  repeatType: document.querySelector('#repeatType'), weeklyField: document.querySelector('#weeklyField'), weeklyValue: document.querySelector('#weeklyValue'),
+  monthlyField: document.querySelector('#monthlyField'), monthlyValue: document.querySelector('#monthlyValue'), yearlyField: document.querySelector('#yearlyField'), yearlyValue: document.querySelector('#yearlyValue'),
+  icon: document.querySelector('#icon'), iconPicker: document.querySelector('#iconPicker'), note: document.querySelector('#note'), events: document.querySelector('#events'), status: document.querySelector('#status'),
+  supabaseUrl: document.querySelector('#supabaseUrl'), supabaseKey: document.querySelector('#supabaseKey'), saveCloud: document.querySelector('#saveCloud'), newSpace: document.querySelector('#newSpace'), shareSync: document.querySelector('#shareSync'),
+  shareOutput: document.querySelector('#shareOutput'), shareLink: document.querySelector('#shareLink'), exportJson: document.querySelector('#exportJson'), importJson: document.querySelector('#importJson'), importButton: document.querySelector('#importButton'),
+  saveEvent: document.querySelector('#saveEvent'), resetForm: document.querySelector('#resetForm')
 };
 
-function showView(name) {
-  document.querySelectorAll('.view').forEach(view => view.classList.remove('active'));
-  document.querySelector(`#${name}View`).classList.add('active');
-  document.querySelectorAll('.nav-btn').forEach(button => button.classList.toggle('active', button.dataset.viewTarget === name));
-}
+function showView(name){document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.querySelector(`#${name}View`).classList.add('active');document.querySelectorAll('.nav-btn').forEach(b=>b.classList.toggle('active',b.dataset.viewTarget===name));}
+function setStatus(message,tone=''){el.status.textContent=message;el.status.className=`status ${tone}`.trim();}
+function escapeHtml(value){return String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');}
+function selectedIcon(event){const iconName=event.icon||defaultIcons[event.category]||defaultIcons.custom;return iconOptions.find(([name])=>name===iconName)?.[1]||'⭐';}
+function renderIconPicker(){el.iconPicker.innerHTML=iconOptions.map(([name,icon])=>`<button class="icon-choice" type="button" data-icon="${name}" aria-label="图标 ${name}">${icon}</button>`).join('');}
+function setActiveIcon(iconName=''){el.icon.value=iconName;el.iconPicker.querySelectorAll('.icon-choice').forEach(button=>button.classList.toggle('active',button.dataset.icon===iconName));}
+function updateRepeatFields(){const type=el.repeatType.value;el.weeklyField.classList.toggle('active',type==='weekly');el.monthlyField.classList.toggle('active',type==='monthly');el.yearlyField.classList.toggle('active',type==='yearly');if(type==='weekly'&&!el.weeklyValue.value)el.weeklyValue.value=String(new Date().getDay());if(type==='monthly'&&!el.monthlyValue.value)el.monthlyValue.value='10';if(type==='yearly'&&!el.yearlyValue.value)el.yearlyValue.value='09-06';}
+function readRepeatValue(){if(el.repeatType.value==='weekly')return el.weeklyValue.value;if(el.repeatType.value==='monthly')return el.monthlyValue.value;if(el.repeatType.value==='yearly')return el.yearlyValue.value;return '';}
+function readConfig(){try{return JSON.parse(localStorage.getItem(STORAGE_CONFIG)||'{}');}catch{return {};}}
+function writeConfig(config){localStorage.setItem(STORAGE_CONFIG,JSON.stringify(config));}
+function loadLocal(){try{const local=JSON.parse(localStorage.getItem(STORAGE_EVENTS)||'[]');events=Array.isArray(local)?local.map(normalizeEvent):[];}catch{events=[];}}
+function saveLocal(){localStorage.setItem(STORAGE_EVENTS,JSON.stringify(events));localStorage.setItem(STORAGE_OWNER,ownerKey);}
+function cloudRowToEvent(row){return normalizeEvent({id:row.id,title:row.title,date:row.date,category:row.category,icon:row.icon,repeatType:row.repeat_type,repeatValue:row.repeat_value,updatedAt:row.updated_at,note:row.note});}
+function eventToCloudRow(event){const normalized=normalizeEvent(event);return {id:normalized.id,title:normalized.title,date:normalized.date,category:normalized.category,icon:normalized.icon,repeat_type:normalized.repeatType,repeat_value:normalized.repeatValue,updated_at:normalized.updatedAt||new Date().toISOString(),note:normalized.note,owner_key:ownerKey};}
+function isMissingCloudColumns(error){return /column .*countdown_events\.(icon|repeat_type|repeat_value|updated_at).*does not exist/i.test(String(error?.message||''));}
+async function connectSupabase(){const saved=readConfig();if(!saved.url||!saved.key)return false;const config=normalizeSupabaseConfig(saved);el.supabaseUrl.value=config.url;el.supabaseKey.value=config.key;const {createClient}=await import('https://esm.sh/@supabase/supabase-js@2');supabaseClient=createClient(config.url,config.key);return true;}
+async function pullCloud(){if(!supabaseClient)return;const localBeforePull=[...events];let missingColumns=false;let {data,error}=await supabaseClient.from('countdown_events').select('id,title,date,category,icon,repeat_type,repeat_value,updated_at,note').eq('owner_key',ownerKey).order('date',{ascending:true});if(isMissingCloudColumns(error)){missingColumns=true;const fallback=await supabaseClient.from('countdown_events').select('id,title,date,category,note').eq('owner_key',ownerKey).order('date',{ascending:true});data=fallback.data;error=fallback.error;setStatus('云端表还没更新字段：先按旧数据读取。请执行 supabase-schema.sql 后再同步新功能。','warn');}if(error)throw error;const cloudEvents=(data||[]).map(cloudRowToEvent);if(shouldKeepLocalAfterCloudPull(localBeforePull,cloudEvents,{missingColumns})){events=localBeforePull;saveLocal();return;}events=mergeEventsForSync(localBeforePull,cloudEvents);saveLocal();}
+async function pushCloud(){if(!supabaseClient)return;const rows=events.map(eventToCloudRow);if(rows.length===0)return;const {error}=await supabaseClient.from('countdown_events').upsert(rows,{onConflict:'id'});if(error)throw error;}
+async function persist(){saveLocal();render();if(!supabaseClient){setStatus(text.localSaved,'warn');return;}try{await pushCloud();setStatus(text.cloudSaved,'ok');}catch(error){setStatus(`云端同步失败：${error.message}`,'error');}}
+function render(){const sorted=sortEvents(events);if(sorted.length===0){el.events.innerHTML=`<div class="empty">${text.empty}</div>`;return;}el.events.innerHTML=sorted.map((event,index)=>{const distance=describeEventDistance(event);const dark=index%5===1;const titleSuffix=distance.tone==='future'?'还有':'';return `<article class="count-card ${dark?'dark':''}"><div class="card-actions"><button class="mini-btn" type="button" data-edit="${escapeHtml(event.id)}">编辑</button><button class="mini-btn" type="button" data-delete="${escapeHtml(event.id)}">删除</button></div><h3>${escapeHtml(event.title)}${titleSuffix}</h3><div class="big-count"><strong>${escapeHtml(distance.num)}</strong><span>${escapeHtml(distance.unit)}</span></div><div class="card-meta"><span>${escapeHtml(labels[event.category]||labels.custom)}</span><span>${escapeHtml(formatEventRule(event))}</span>${event.note?`<span>${escapeHtml(event.note)}</span>`:''}</div><div class="card-emoji">${selectedIcon(event)}</div></article>`;}).join('');}
+async function copyText(value){if(navigator.clipboard?.writeText){try{await navigator.clipboard.writeText(value);return true;}catch{}}const area=document.createElement('textarea');area.value=value;area.style.position='fixed';area.style.left='-9999px';document.body.append(area);area.select();const copied=document.execCommand('copy');area.remove();return copied;}
+function resetForm(){el.eventId.value='';el.form.reset();el.category.value='anniversary';el.repeatType.value='none';el.weeklyValue.value='5';el.monthlyValue.value='10';el.yearlyValue.value='09-06';setActiveIcon('');updateRepeatFields();el.saveEvent.textContent=text.save;}
+function openEventDialog(item=null){if(item){el.eventId.value=item.id;el.title.value=item.title;el.date.value=item.date;el.category.value=item.category;el.repeatType.value=item.repeatType||'none';el.weeklyValue.value=item.repeatType==='weekly'?item.repeatValue:'5';el.monthlyValue.value=item.repeatType==='monthly'?item.repeatValue:'10';el.yearlyValue.value=item.repeatType==='yearly'?item.repeatValue:'09-06';el.note.value=item.note;setActiveIcon(item.icon||'');updateRepeatFields();el.saveEvent.textContent=text.update;}else{resetForm();}el.eventDialog.showModal();setTimeout(()=>el.title.focus(),0);}
+function closeEventDialog(){el.eventDialog.close();}
+function readFormEvent(){return normalizeEvent({id:el.eventId.value||createId(),title:el.title.value,date:el.date.value,category:el.category.value,icon:el.icon.value,repeatType:el.repeatType.value,repeatValue:readRepeatValue(),updatedAt:new Date().toISOString(),note:el.note.value});}
 
-function setStatus(message, tone = '') {
-  el.status.textContent = message;
-  el.status.className = `status ${tone}`.trim();
-}
+el.sidebarToggle.addEventListener('click',()=>document.body.classList.toggle('sidebar-collapsed'));
+el.navButtons.forEach(button=>button.addEventListener('click',()=>showView(button.dataset.viewTarget)));
+el.addEventButton.addEventListener('click',()=>openEventDialog());
+el.closeEventDialog.addEventListener('click',closeEventDialog);
+el.eventDialog.addEventListener('click',event=>{if(event.target===el.eventDialog)closeEventDialog();});
+el.repeatType.addEventListener('change',updateRepeatFields);
+el.iconPicker.addEventListener('click',event=>{const button=event.target.closest('[data-icon]');if(!button)return;setActiveIcon(el.icon.value===button.dataset.icon?'':button.dataset.icon);});
+el.form.addEventListener('submit',async event=>{event.preventDefault();try{const normalized=readFormEvent();const index=events.findIndex(item=>item.id===normalized.id);if(index>=0)events[index]=normalized;else events.push(normalized);resetForm();closeEventDialog();await persist();}catch(error){setStatus(error.message,'error');}});
+el.events.addEventListener('click',async event=>{const editId=event.target.dataset.edit;const deleteId=event.target.dataset.delete;if(editId){const item=events.find(entry=>entry.id===editId);if(!item)return;showView('home');openEventDialog(item);}if(deleteId){events=events.filter(entry=>entry.id!==deleteId);await persist();}});
+el.saveCloud.addEventListener('click',async()=>{try{const config=normalizeSupabaseConfig({url:el.supabaseUrl.value,key:el.supabaseKey.value});writeConfig(config);el.supabaseUrl.value=config.url;el.supabaseKey.value=config.key;const connected=await connectSupabase();if(!connected){setStatus('请填写 Supabase URL 和 publishable key。','warn');return;}await pullCloud();await pushCloud();await pullCloud();render();setStatus(text.configSaved,'ok');}catch(error){setStatus(`连接失败：${error.message}`,'error');}});
+el.newSpace.addEventListener('click',()=>{ownerKey=createOwnerKey();localStorage.setItem(STORAGE_OWNER,ownerKey);setStatus('已创建新的同步空间。保存数据后即可生成新链接。','ok');});
+el.shareSync.addEventListener('click',async()=>{const url=new URL(location.href);url.searchParams.set('sync',ownerKey);if(events.length)url.searchParams.set('data',serializeEvents(events));const link=url.toString();el.shareLink.value=link;el.shareOutput.classList.add('active');el.shareLink.focus();el.shareLink.select();const copied=await copyText(link);setStatus(copied?text.shareCopied:text.shareShown,copied?'ok':'warn');});
+el.exportJson.addEventListener('click',()=>{const blob=new Blob([JSON.stringify(events,null,2)],{type:'application/json'});const link=document.createElement('a');link.href=URL.createObjectURL(blob);link.download='anniversary-countdown.json';link.click();URL.revokeObjectURL(link.href);});
+el.importButton.addEventListener('click',()=>el.importJson.click());
+el.importJson.addEventListener('change',async()=>{const file=el.importJson.files[0];if(!file)return;try{const imported=JSON.parse(await file.text());events=imported.map(item=>normalizeEvent({...item,id:item.id||createId(),updatedAt:item.updatedAt||new Date().toISOString()}));await persist();}catch(error){setStatus(`导入失败：${error.message}`,'error');}finally{el.importJson.value='';}});
+el.resetForm.addEventListener('click',resetForm);
 
-function escapeHtml(value) {
-  return String(value)
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
-}
-
-function selectedIcon(event) {
-  const iconName = event.icon || defaultIcons[event.category] || defaultIcons.custom;
-  return iconOptions.find(([name]) => name === iconName)?.[1] || '⭐';
-}
-
-function renderIconPicker() {
-  el.iconPicker.innerHTML = iconOptions
-    .map(([name, icon]) => `<button class="icon-choice" type="button" data-icon="${name}" aria-label="图标 ${name}">${icon}</button>`)
-    .join('');
-}
-
-function setActiveIcon(iconName = '') {
-  el.icon.value = iconName;
-  el.iconPicker.querySelectorAll('.icon-choice').forEach(button => {
-    button.classList.toggle('active', button.dataset.icon === iconName);
-  });
-}
-
-function updateRepeatFields() {
-  const type = el.repeatType.value;
-  el.weeklyField.classList.toggle('active', type === 'weekly');
-  el.monthlyField.classList.toggle('active', type === 'monthly');
-  el.yearlyField.classList.toggle('active', type === 'yearly');
-  if (type === 'weekly' && !el.weeklyValue.value) el.weeklyValue.value = String(new Date().getDay());
-  if (type === 'monthly' && !el.monthlyValue.value) el.monthlyValue.value = '10';
-  if (type === 'yearly' && !el.yearlyValue.value) el.yearlyValue.value = '09-06';
-}
-
-function readRepeatValue() {
-  if (el.repeatType.value === 'weekly') return el.weeklyValue.value;
-  if (el.repeatType.value === 'monthly') return el.monthlyValue.value;
-  if (el.repeatType.value === 'yearly') return el.yearlyValue.value;
-  return '';
-}
-
-function readConfig() {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_CONFIG) || '{}');
-  } catch {
-    return {};
-  }
-}
-
-function writeConfig(config) {
-  localStorage.setItem(STORAGE_CONFIG, JSON.stringify(config));
-}
-
-function loadLocal() {
-  try {
-    const local = JSON.parse(localStorage.getItem(STORAGE_EVENTS) || '[]');
-    events = Array.isArray(local) ? local.map(normalizeEvent) : [];
-  } catch {
-    events = [];
-  }
-}
-
-function saveLocal() {
-  localStorage.setItem(STORAGE_EVENTS, JSON.stringify(events));
-  localStorage.setItem(STORAGE_OWNER, ownerKey);
-}
-
-function cloudRowToEvent(row) {
-  return normalizeEvent({
-    id: row.id,
-    title: row.title,
-    date: row.date,
-    category: row.category,
-    icon: row.icon,
-    repeatType: row.repeat_type,
-    repeatValue: row.repeat_value,
-    note: row.note
-  });
-}
-
-function eventToCloudRow(event) {
-  const normalized = normalizeEvent(event);
-  return {
-    id: normalized.id,
-    title: normalized.title,
-    date: normalized.date,
-    category: normalized.category,
-    icon: normalized.icon,
-    repeat_type: normalized.repeatType,
-    repeat_value: normalized.repeatValue,
-    note: normalized.note,
-    owner_key: ownerKey
-  };
-}
-
-function isMissingCloudColumns(error) {
-  return /column .*countdown_events\.(icon|repeat_type|repeat_value).*does not exist/i.test(String(error?.message || ''));
-}
-
-async function connectSupabase() {
-  const saved = readConfig();
-  if (!saved.url || !saved.key) return false;
-  const config = normalizeSupabaseConfig(saved);
-  el.supabaseUrl.value = config.url;
-  el.supabaseKey.value = config.key;
-  const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
-  supabaseClient = createClient(config.url, config.key);
-  return true;
-}
-
-async function pullCloud() {
-  if (!supabaseClient) return;
-  const localBeforePull = [...events];
-  let missingColumns = false;
-  let { data, error } = await supabaseClient
-    .from('countdown_events')
-    .select('id,title,date,category,icon,repeat_type,repeat_value,note')
-    .eq('owner_key', ownerKey)
-    .order('date', { ascending: true });
-  if (isMissingCloudColumns(error)) {
-    missingColumns = true;
-    const fallback = await supabaseClient
-      .from('countdown_events')
-      .select('id,title,date,category,note')
-      .eq('owner_key', ownerKey)
-      .order('date', { ascending: true });
-    data = fallback.data;
-    error = fallback.error;
-    setStatus('云端表还没更新字段：先按旧数据读取。请执行 supabase-schema.sql 后再同步新功能。', 'warn');
-  }
-  if (error) throw error;
-  const cloudEvents = data.map(cloudRowToEvent);
-  if (shouldKeepLocalAfterCloudPull(localBeforePull, cloudEvents, { missingColumns })) {
-    events = localBeforePull;
-    saveLocal();
-    return;
-  }
-  events = cloudEvents;
-  saveLocal();
-}
-
-async function pushCloud() {
-  if (!supabaseClient) return;
-  const rows = events.map(eventToCloudRow);
-  const { error: deleteError } = await supabaseClient.from('countdown_events').delete().eq('owner_key', ownerKey);
-  if (deleteError) throw deleteError;
-  if (rows.length === 0) return;
-  const { error: insertError } = await supabaseClient.from('countdown_events').insert(rows);
-  if (insertError) throw insertError;
-}
-
-async function persist() {
-  saveLocal();
-  render();
-  if (!supabaseClient) {
-    setStatus(text.localSaved, 'warn');
-    return;
-  }
-  try {
-    await pushCloud();
-    setStatus(text.cloudSaved, 'ok');
-  } catch (error) {
-    setStatus(`云端同步失败：${error.message}`, 'error');
-  }
-}
-
-function render() {
-  const sorted = sortEvents(events);
-  if (sorted.length === 0) {
-    el.events.innerHTML = `<div class="empty">${text.empty}</div>`;
-    return;
-  }
-  el.events.innerHTML = sorted.map((event, index) => {
-    const distance = describeEventDistance(event);
-    const dark = index % 5 === 1;
-    const titleSuffix = distance.tone === 'future' ? '还有' : '';
-    return `<article class="count-card ${dark ? 'dark' : ''}">
-      <div class="card-actions">
-        <button class="mini-btn" type="button" data-edit="${escapeHtml(event.id)}">编辑</button>
-        <button class="mini-btn" type="button" data-delete="${escapeHtml(event.id)}">删除</button>
-      </div>
-      <h3>${escapeHtml(event.title)}${titleSuffix}</h3>
-      <div class="big-count"><strong>${escapeHtml(distance.num)}</strong><span>${escapeHtml(distance.unit)}</span></div>
-      <div class="card-meta">
-        <span>${escapeHtml(labels[event.category] || labels.custom)}</span>
-        <span>${escapeHtml(formatEventRule(event))}</span>
-        ${event.note ? `<span>${escapeHtml(event.note)}</span>` : ''}
-      </div>
-      <div class="card-emoji">${selectedIcon(event)}</div>
-    </article>`;
-  }).join('');
-}
-
-async function copyText(value) {
-  if (navigator.clipboard?.writeText) {
-    try {
-      await navigator.clipboard.writeText(value);
-      return true;
-    } catch {}
-  }
-  const area = document.createElement('textarea');
-  area.value = value;
-  area.style.position = 'fixed';
-  area.style.left = '-9999px';
-  document.body.append(area);
-  area.select();
-  const copied = document.execCommand('copy');
-  area.remove();
-  return copied;
-}
-
-function resetForm() {
-  el.eventId.value = '';
-  el.form.reset();
-  el.category.value = 'anniversary';
-  el.repeatType.value = 'none';
-  el.weeklyValue.value = '5';
-  el.monthlyValue.value = '10';
-  el.yearlyValue.value = '09-06';
-  setActiveIcon('');
-  updateRepeatFields();
-  el.saveEvent.textContent = text.save;
-}
-
-function openEventDialog(item = null) {
-  if (item) {
-    el.eventId.value = item.id;
-    el.title.value = item.title;
-    el.date.value = item.date;
-    el.category.value = item.category;
-    el.repeatType.value = item.repeatType || 'none';
-    el.weeklyValue.value = item.repeatType === 'weekly' ? item.repeatValue : '5';
-    el.monthlyValue.value = item.repeatType === 'monthly' ? item.repeatValue : '10';
-    el.yearlyValue.value = item.repeatType === 'yearly' ? item.repeatValue : '09-06';
-    el.note.value = item.note;
-    setActiveIcon(item.icon || '');
-    updateRepeatFields();
-    el.saveEvent.textContent = text.update;
-  } else {
-    resetForm();
-  }
-  el.eventDialog.showModal();
-  setTimeout(() => el.title.focus(), 0);
-}
-
-function closeEventDialog() {
-  el.eventDialog.close();
-}
-
-function readFormEvent() {
-  return normalizeEvent({
-    id: el.eventId.value || createId(),
-    title: el.title.value,
-    date: el.date.value,
-    category: el.category.value,
-    icon: el.icon.value,
-    repeatType: el.repeatType.value,
-    repeatValue: readRepeatValue(),
-    note: el.note.value
-  });
-}
-
-el.sidebarToggle.addEventListener('click', () => document.body.classList.toggle('sidebar-collapsed'));
-el.navButtons.forEach(button => button.addEventListener('click', () => showView(button.dataset.viewTarget)));
-el.addEventButton.addEventListener('click', () => openEventDialog());
-el.closeEventDialog.addEventListener('click', closeEventDialog);
-el.eventDialog.addEventListener('click', event => {
-  if (event.target === el.eventDialog) closeEventDialog();
-});
-el.repeatType.addEventListener('change', updateRepeatFields);
-el.iconPicker.addEventListener('click', event => {
-  const button = event.target.closest('[data-icon]');
-  if (!button) return;
-  setActiveIcon(el.icon.value === button.dataset.icon ? '' : button.dataset.icon);
-});
-el.form.addEventListener('submit', async event => {
-  event.preventDefault();
-  try {
-    const normalized = readFormEvent();
-    const index = events.findIndex(item => item.id === normalized.id);
-    if (index >= 0) events[index] = normalized;
-    else events.push(normalized);
-    resetForm();
-    closeEventDialog();
-    await persist();
-  } catch (error) {
-    setStatus(error.message, 'error');
-  }
-});
-el.events.addEventListener('click', async event => {
-  const editId = event.target.dataset.edit;
-  const deleteId = event.target.dataset.delete;
-  if (editId) {
-    const item = events.find(entry => entry.id === editId);
-    if (!item) return;
-    showView('home');
-    openEventDialog(item);
-  }
-  if (deleteId) {
-    events = events.filter(entry => entry.id !== deleteId);
-    await persist();
-  }
-});
-el.saveCloud.addEventListener('click', async () => {
-  try {
-    const config = normalizeSupabaseConfig({ url: el.supabaseUrl.value, key: el.supabaseKey.value });
-    writeConfig(config);
-    el.supabaseUrl.value = config.url;
-    el.supabaseKey.value = config.key;
-    const connected = await connectSupabase();
-    if (!connected) {
-      setStatus('请填写 Supabase URL 和 publishable key。', 'warn');
-      return;
-    }
-    await pullCloud();
-    render();
-    setStatus(text.configSaved, 'ok');
-  } catch (error) {
-    setStatus(`连接失败：${error.message}`, 'error');
-  }
-});
-el.newSpace.addEventListener('click', () => {
-  ownerKey = createOwnerKey();
-  localStorage.setItem(STORAGE_OWNER, ownerKey);
-  setStatus('已创建新的同步空间。保存数据后即可生成新链接。', 'ok');
-});
-el.shareSync.addEventListener('click', async () => {
-  const url = new URL(location.href);
-  url.searchParams.set('sync', ownerKey);
-  if (events.length) url.searchParams.set('data', serializeEvents(events));
-  const link = url.toString();
-  el.shareLink.value = link;
-  el.shareOutput.classList.add('active');
-  el.shareLink.focus();
-  el.shareLink.select();
-  const copied = await copyText(link);
-  setStatus(copied ? text.shareCopied : text.shareShown, copied ? 'ok' : 'warn');
-});
-el.exportJson.addEventListener('click', () => {
-  const blob = new Blob([JSON.stringify(events, null, 2)], { type: 'application/json' });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = 'anniversary-countdown.json';
-  link.click();
-  URL.revokeObjectURL(link.href);
-});
-el.importButton.addEventListener('click', () => el.importJson.click());
-el.importJson.addEventListener('change', async () => {
-  const file = el.importJson.files[0];
-  if (!file) return;
-  try {
-    const imported = JSON.parse(await file.text());
-    events = imported.map(item => normalizeEvent({ ...item, id: item.id || createId() }));
-    await persist();
-  } catch (error) {
-    setStatus(`导入失败：${error.message}`, 'error');
-  } finally {
-    el.importJson.value = '';
-  }
-});
-el.resetForm.addEventListener('click', resetForm);
-
-async function init() {
-  renderIconPicker();
-  resetForm();
-  localStorage.setItem(STORAGE_OWNER, ownerKey);
-  loadLocal();
-  const sharedData = params.get('data');
-  if (sharedData) {
-    try {
-      events = deserializeEvents(sharedData).map(event => ({ ...event, id: event.id || createId() }));
-      saveLocal();
-    } catch (error) {
-      setStatus(`分享数据读取失败：${error.message}`, 'error');
-    }
-  }
-  render();
-  try {
-    const connected = await connectSupabase();
-    if (connected) {
-      await pullCloud();
-      render();
-      setStatus(text.cloudConnected, 'ok');
-    }
-  } catch (error) {
-    setStatus(`云端未连接：${error.message}`, 'warn');
-  }
-}
+async function init(){renderIconPicker();resetForm();localStorage.setItem(STORAGE_OWNER,ownerKey);loadLocal();const sharedData=params.get('data');if(sharedData){try{events=deserializeEvents(sharedData).map(event=>({...event,id:event.id||createId(),updatedAt:event.updatedAt||new Date().toISOString()}));saveLocal();}catch(error){setStatus(`分享数据读取失败：${error.message}`,'error');}}render();try{const connected=await connectSupabase();if(connected){await pullCloud();render();setStatus(text.cloudConnected,'ok');}}catch(error){setStatus(`云端未连接：${error.message}`,'warn');}}
 
 init();
 </script>
