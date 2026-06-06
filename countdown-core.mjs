@@ -72,6 +72,10 @@ function eventTimestamp(event) {
   return Number.isNaN(parsed) ? 0 : parsed;
 }
 
+function eventDeletedAt(event) {
+  return normalizeUpdatedAt(event?.deletedAt || event?.deleted_at);
+}
+
 export function daysBetween(targetDate, baseDate = new Date()) {
   const target = dateOnly(targetDate);
   const base = dateOnly(
@@ -146,6 +150,7 @@ export function normalizeEvent(event) {
   const repeatType = normalizeRepeatType(event?.repeatType);
   const repeatValue = normalizeRepeatValue(repeatType, event?.repeatValue, date);
   const updatedAt = normalizeUpdatedAt(event?.updatedAt || event?.updated_at);
+  const deletedAt = eventDeletedAt(event);
   const note = String(event?.note || '').trim();
 
   if (!title) throw new Error('标题不能为空');
@@ -161,12 +166,21 @@ export function normalizeEvent(event) {
     repeatType,
     repeatValue,
     updatedAt,
+    deletedAt,
     note
   };
 }
 
+export function isDeletedEvent(event) {
+  return Boolean(eventDeletedAt(event));
+}
+
+export function activeEvents(events) {
+  return (events || []).filter(event => !isDeletedEvent(event));
+}
+
 export function sortEvents(events, baseDate = new Date()) {
-  return [...events].sort((a, b) => {
+  return activeEvents(events).sort((a, b) => {
     const dayA = daysBetween(getNextOccurrence(a, baseDate), baseDate);
     const dayB = daysBetween(getNextOccurrence(b, baseDate), baseDate);
     if (dayA >= 0 && dayB < 0) return -1;
