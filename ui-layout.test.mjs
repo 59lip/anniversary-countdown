@@ -17,6 +17,7 @@ assert.match(html, /id="weeklyValue"/, 'add dialog supports weekly recurrence');
 assert.match(html, /id="monthlyValue"/, 'add dialog supports monthly recurrence');
 assert.match(html, /id="yearlyValue"/, 'add dialog supports yearly recurrence');
 assert.match(html, /isMissingCloudColumns/, 'cloud sync tolerates old Supabase schemas');
+assert.match(html, /await pullCloud\(\);\s*await pushCloud\(\);\s*await pullCloud\(\);/s, 'save cloud performs a merge round trip');
 
 const eventsIndex = html.indexOf('id="eventsSection"');
 const dialogIndex = html.indexOf('id="eventDialog"');
