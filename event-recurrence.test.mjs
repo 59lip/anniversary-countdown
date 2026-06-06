@@ -33,6 +33,7 @@ assert.deepEqual(
     icon: 'wallet',
     repeatType: 'monthly',
     repeatValue: '10',
+    updatedAt: '',
     note: ''
   }
 );
