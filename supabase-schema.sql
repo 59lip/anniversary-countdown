@@ -3,6 +3,7 @@ create table if not exists public.countdown_events (
   owner_key text not null,
   title text not null,
   date date not null,
+  time text not null default '',
   category text not null default 'custom',
   icon text not null default '',
   repeat_type text not null default 'none',
@@ -14,11 +15,14 @@ create table if not exists public.countdown_events (
 );
 
 alter table public.countdown_events
+  add column if not exists time text not null default '',
   add column if not exists icon text not null default '',
   add column if not exists repeat_type text not null default 'none',
   add column if not exists repeat_value text not null default '',
   add column if not exists updated_at timestamptz not null default now(),
   add column if not exists deleted_at timestamptz;
+
+notify pgrst, 'reload schema';
 
 create index if not exists countdown_events_owner_key_idx
   on public.countdown_events (owner_key);
