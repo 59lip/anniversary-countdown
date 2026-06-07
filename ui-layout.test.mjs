@@ -12,6 +12,7 @@ assert.match(html, /id="cloudView"/, 'has cloud settings view');
 assert.match(html, /id="addEventButton"/, 'has a top-right add button');
 assert.match(html, /id="homeSync"/, 'has a home sync button');
 assert.match(html, /id="eventDialog"/, 'has an add/edit modal dialog');
+assert.match(html, /id="time" type="time"/, 'add dialog has optional event time');
 assert.match(html, /id="iconPicker"/, 'add dialog has an icon picker');
 assert.match(html, /id="repeatType"/, 'add dialog has repeat type selector');
 assert.match(html, /id="weeklyValue"/, 'add dialog supports weekly recurrence');
@@ -21,6 +22,10 @@ assert.match(html, /data-filter="all"/, 'all filter is clickable');
 assert.match(html, /data-filter="recent"/, 'recent filter is clickable');
 assert.match(html, /data-filter="today"/, 'today filter is clickable');
 assert.match(html, /filterEvents/, 'home filters use core filtering');
+assert.match(html, /titleText/, 'cards render unified countdown titles');
+assert.match(html, /renderParts/, 'cards render multi-part timed countdowns');
+assert.match(html, /longText/, 'cards render long-distance helper text');
+assert.match(html, /select\('id,title,date,time,category,icon,repeat_type,repeat_value,updated_at,deleted_at,note'\)/, 'cloud sync includes optional time');
 assert.match(html, /isMissingCloudColumns/, 'cloud sync tolerates old Supabase schemas');
 assert.match(html, /await pullCloud\(\);\s*await pushCloud\(\);\s*await pullCloud\(\);/s, 'sync performs a merge round trip');
 assert.match(html, /setTimeout\(\(\)\s*=>\s*\{\s*el\.status\.textContent\s*=\s*'';/s, 'status auto clears');
@@ -37,6 +42,9 @@ assert.equal(html.includes('id="homeSyncSection"'), false, 'home does not contai
 assert.equal(html.includes('searchParams.set(\'data\''), false, 'sync links do not embed event data');
 assert.equal(html.includes('卡片式倒计时'), false, 'home removes eyebrow copy');
 assert.equal(html.includes('用清晰'), false, 'home removes descriptive copy');
+assert.equal(html.includes('brand-title'), false, 'sidebar no longer shows the brand title');
+assert.equal(html.includes('brand-mark'), false, 'sidebar no longer shows the cloud-like brand icon');
+assert.equal(html.includes('每一迹'), false, 'sidebar no longer shows 每一迹');
 assert.equal(html.includes('下一次 ${escapeHtml(distance.nextDate)}'), false, 'cards do not show the next occurrence date');
 
 console.log('ui layout tests passed');
