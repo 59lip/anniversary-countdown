@@ -9,6 +9,7 @@ import {
 } from './countdown-core.mjs';
 
 const base = new Date(2026, 5, 11); // 2026-06-11
+const timedBase = new Date(2026, 5, 11, 9, 30); // 2026-06-11 09:30
 
 assert.equal(getNextOccurrence({ repeatType: 'none', date: '2026-06-20' }, base), '2026-06-20');
 assert.equal(getNextOccurrence({ repeatType: 'monthly', repeatValue: '10' }, base), '2026-07-10');
@@ -16,21 +17,37 @@ assert.equal(getNextOccurrence({ repeatType: 'monthly', repeatValue: '12' }, bas
 assert.equal(getNextOccurrence({ repeatType: 'weekly', repeatValue: '5' }, base), '2026-06-12');
 assert.equal(getNextOccurrence({ repeatType: 'yearly', repeatValue: '09-06' }, base), '2026-09-06');
 assert.equal(getNextOccurrence({ repeatType: 'yearly', repeatValue: '06-10' }, base), '2027-06-10');
+assert.equal(getNextOccurrence({ repeatType: 'weekly', repeatValue: '4', date: '2026-06-11', time: '08:30' }, timedBase), '2026-06-18');
 
 assert.deepEqual(
-  normalizeEvent({ title: '发工资', date: '2026-06-10', category: 'work', icon: 'wallet', repeatType: 'monthly', repeatValue: '10' }),
-  { id: '', title: '发工资', date: '2026-06-10', category: 'work', icon: 'wallet', repeatType: 'monthly', repeatValue: '10', updatedAt: '', deletedAt: '', note: '' }
+  normalizeEvent({ title: '发工资', date: '2026-06-10', time: '18:30', category: 'work', icon: 'wallet', repeatType: 'monthly', repeatValue: '10' }),
+  { id: '', title: '发工资', date: '2026-06-10', time: '18:30', category: 'work', icon: 'wallet', repeatType: 'monthly', repeatValue: '10', updatedAt: '', deletedAt: '', note: '' }
 );
 
 assert.equal(normalizeEvent({ title: '高考', date: '2026-06-07' }).repeatType, 'none');
-assert.equal(formatEventRule({ repeatType: 'monthly', repeatValue: '10', date: '2026-06-10' }), '每月10日');
+assert.equal(normalizeEvent({ title: '高考', date: '2026-06-07' }).time, '');
+assert.equal(formatEventRule({ repeatType: 'monthly', repeatValue: '10', date: '2026-06-10', time: '18:30' }), '每月10日 18:30');
 assert.equal(formatEventRule({ repeatType: 'weekly', repeatValue: '5', date: '2026-06-12' }), '每周五');
 assert.equal(formatEventRule({ repeatType: 'yearly', repeatValue: '09-06', date: '2026-09-06' }), '每年09月06日');
 
-const salary = describeEventDistance({ repeatType: 'monthly', repeatValue: '10', date: '2026-06-10' }, base);
+const salary = describeEventDistance({ title: '发工资', repeatType: 'monthly', repeatValue: '10', date: '2026-06-10' }, base);
 assert.equal(salary.num, '29');
+assert.equal(salary.titleText, '距离发工资还有');
 assert.equal(salary.label, '还有 29 天');
 assert.equal(salary.nextDate, '2026-07-10');
+
+const visa = describeEventDistance({ title: '办签证', date: '2026-06-13', time: '13:45' }, timedBase);
+assert.equal(visa.titleText, '距离办签证还有');
+assert.deepEqual(visa.parts, [
+  { value: '2', unit: '天' },
+  { value: '4', unit: '小时' },
+  { value: '15', unit: '分钟' }
+]);
+
+const oldExam = describeEventDistance({ title: '18年高考', date: '2018-06-06' }, base);
+assert.equal(oldExam.titleText, '18年高考已过去');
+assert.equal(oldExam.num, '2927');
+assert.match(oldExam.longText, /^8 年 0 个月 5 天$/);
 
 const sampleEvents = [
   { title: '下月发工资', date: '2026-06-10', repeatType: 'monthly', repeatValue: '10' },
